@@ -33,6 +33,17 @@ class Point:
     x: int
     y: int
 
+    def __add__(self, other):
+        # Check if 'other' is an instance of Point
+        if isinstance(other, Point):
+            return elliptic_curve_addition(self, other)
+        else:
+            raise TypeError("C'mon, man...ya can't add a Point and {type(other).__name__}")
+
+
+    def __rmul__(self, scalar):
+        double_and_add(self, scalar)
+
 
 def create_generator_point(bitcoin_curve):
     print("Creating generator point...")
@@ -142,12 +153,48 @@ def elliptic_curve_addition(self, other: Point) -> Point:
     return Point(self.curve, rx, ry)
 
 
+def check_keypair(secret_key, private_key, bitcoin_curve):
+    print(f'    secret key : {secret_key}')
+    print(f'    private key: {private_key}')
+    on_curve = (private_key.y**2 - private_key.x**3 - 7) % bitcoin_curve.p == 0
+    print(f'    on curve?  : {on_curve}')
+
+
+def recreate_keypair_examples(G, bitcoin_curve):
+    print('Recreating keypair examples...')
+    check_keypair(1, G, bitcoin_curve)
+    check_keypair(2, G + G, bitcoin_curve)
+    check_keypair(3, G + G + G, bitcoin_curve)
+
+
+def double_and_add(self, k: int) -> Point:
+    assert isinstance(k, int) and k >= 0
+    result = INF
+    append = self
+    while k:
+        if k & 1:
+            result += append
+        append += append
+        k >>= 1
+
+    return result
+
+
+def recreate_more_efficient_examples(G):
+    print('Recreating more efficient examples...')
+    # Verify the redefinition of __rmul__ worked as intended
+    # TODO:  This assertion fails...it should not.
+    assert G == 1 * G
+
+
 def main():
     preamble()
     bitcoin_curve = create_bitcoin_curve()
     G = create_generator_point(bitcoin_curve)
     bitcoin_gen = create_generator(G)
     create_secret_key(bitcoin_gen)
+    recreate_keypair_examples(G, bitcoin_curve)
+    recreate_more_efficient_examples(G)
     postamble()
 
 
