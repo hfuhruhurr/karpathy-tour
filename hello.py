@@ -16,7 +16,9 @@ class Curve:
     b: int
 
 
-def create_bitcoin_curve():
+def create_bitcoin_curve() -> Curve:
+    # secp256k1 uses a = 0, b = 7, so we're dealing with the curve y^2 = x^3 + 7 (mod p)
+
     print("Creating bitcoin curve...")
     return Curve(
         p=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F,
@@ -42,11 +44,11 @@ class Point:
 
 
     def __rmul__(self, scalar):
-        double_and_add(self, scalar)
+        return double_and_add(self, scalar)
 
 
-def create_generator_point(bitcoin_curve):
-    print("Creating generator point...")
+def create_generator_point(bitcoin_curve: Curve) -> Point:
+    print("Creating the bitcoin generator point...")
     G = Point(
         bitcoin_curve,
         x=0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
@@ -55,7 +57,7 @@ def create_generator_point(bitcoin_curve):
 
     # Verifying that the generator point is indeed on the curve: y^2 = x^3 + 7 (mod p)
     print(
-        "    Generator is on the curve: ", (G.y**2 - G.x**3 - 7) % bitcoin_curve.p == 0
+        "    Generator is on the curve: ", verify_point_on_curve(G, bitcoin_curve)
     )
 
     return G
@@ -71,18 +73,16 @@ class Generator:
     n: int  # the order of the generator point, so 0*G = n*G = INF
 
 
-def create_generator(G):
-    print("Creating generator...")
-    bitcoin_gen = Generator(
-        G=G,
+def create_the_bitcoin_generator(the_bitcoin_generator_point: Point) -> Generator:
+    print("Creating the bitcoin generator...")
+    return Generator(
+        G=the_bitcoin_generator_point,
         # the order of G is known and can be mathematically derived
         n=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
     )
 
-    return bitcoin_gen
 
-
-def create_secret_key(bitcoin_gen):
+def create_secret_key(bitcoin_gen: Generator) -> int:
     # secret_key = random.randrange(1, bitcoin_gen.n)  # truly random
     secret_key = int.from_bytes(b"Andrej is cool :P", "big")  # reproducibly random
     assert 1 <= secret_key < bitcoin_gen.n
@@ -106,7 +106,7 @@ def postamble():
 INF = Point(None, None, None)  # a special point at infinity, kinda like a zero
 
 
-def extended_euclidean_algorithm(a, b):
+def extended_euclidean_algorithm(a: int, b: int) -> int:
     """
     Returns (gcd, x, y) s.t. a * x + b * y == gcd
     This function implements the extended Euclidean
@@ -125,7 +125,7 @@ def extended_euclidean_algorithm(a, b):
     return old_r, old_s, old_t
 
 
-def inv(n, p):
+def inv(n:int , p: int) -> int:
     """ returns modular multiplicate inverse m such that (n * m) % p == 1 """
     gcd, x, y = extended_euclidean_algorithm(n, p)
 
@@ -153,14 +153,14 @@ def elliptic_curve_addition(self, other: Point) -> Point:
     return Point(self.curve, rx, ry)
 
 
-def check_keypair(secret_key, private_key, bitcoin_curve):
+def check_keypair(secret_key: int, public_key: Point, bitcoin_curve: Curve) -> None:
     print(f'    secret key : {secret_key}')
-    print(f'    private key: {private_key}')
-    on_curve = (private_key.y**2 - private_key.x**3 - 7) % bitcoin_curve.p == 0
+    print(f'    public key: {public_key}')
+    on_curve = verify_point_on_curve(public_key, bitcoin_curve)
     print(f'    on curve?  : {on_curve}')
 
 
-def recreate_keypair_examples(G, bitcoin_curve):
+def recreate_keypair_examples(G: Point, bitcoin_curve: Curve) -> None:
     print('Recreating keypair examples...')
     check_keypair(1, G, bitcoin_curve)
     check_keypair(2, G + G, bitcoin_curve)
@@ -180,21 +180,40 @@ def double_and_add(self, k: int) -> Point:
     return result
 
 
-def recreate_more_efficient_examples(G):
+def recreate_more_efficient_examples(G: Point) -> None:
     print('Recreating more efficient examples...')
     # Verify the redefinition of __rmul__ worked as intended
-    # TODO:  This assertion fails...it should not.
+    # TODID:  This assertion fails...it should not.
+    # I forgot the "return" in __rmult__ ...d'oh!
     assert G == 1 * G
+    assert G + G == 2 * G
+    assert G + G + G == 3 * G
+
+
+def verify_point_on_curve(point: Point, curve: Curve) -> bool:
+    return (point.y**2 - point.x**3 - 7) % curve.p == 0
+
+
+def generate_public_key(secret_key: int, bitcoin_generator_point: Point, bitcoin_curve: Curve) -> Point:
+    # efficiently calculate our actual public key!
+    print("Generating public key from secret_key...")
+    public_key = secret_key * bitcoin_generator_point
+    print(f"    x: {public_key.x}")
+    print(f"    y: {public_key.y}")
+    print("    Verify the public key is on the curve: ", verify_point_on_curve(public_key, bitcoin_curve))
+
+    return public_key
 
 
 def main():
     preamble()
     bitcoin_curve = create_bitcoin_curve()
     G = create_generator_point(bitcoin_curve)
-    bitcoin_gen = create_generator(G)
-    create_secret_key(bitcoin_gen)
+    bitcoin_gen = create_the_bitcoin_generator(G)
+    secret_key = create_secret_key(bitcoin_gen)
     recreate_keypair_examples(G, bitcoin_curve)
     recreate_more_efficient_examples(G)
+    public_key = generate_public_key(secret_key, G, bitcoin_curve)
     postamble()
 
 
