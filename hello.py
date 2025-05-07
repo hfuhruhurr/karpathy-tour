@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import random
+from typing import Type
 
 random.seed(1337)
 
@@ -91,13 +92,13 @@ def create_secret_key(bitcoin_gen: Generator) -> int:
     return secret_key
 
 
-def preamble():
+def preamble() -> None:
     print("-" * 88)
     print("Hello from karpathy-tour!")
     print("-" * 88)
 
 
-def postamble():
+def postamble() -> None:
     print("-" * 88)
     print("Toodles.")
     print("-" * 88)
@@ -205,7 +206,7 @@ def generate_public_key(secret_key: int, bitcoin_generator_point: Point, bitcoin
     return public_key
 
 
-def generate_sha256_hash_educationally():
+def generate_sha256_hash(b: bytes) -> bytes:
     """
     SHA256 implementation to achieve self-imposed goal of having no dependencies. 
     (`hashlib` is more suited for this but it's a dependency.)
@@ -228,8 +229,6 @@ def generate_sha256_hash_educationally():
     construct a different message that hashes to any given digest.
     """
 
-    print("Generating SHA256 hash educationally...")
-    
     import math
     from itertools import count, islice
 
@@ -349,82 +348,61 @@ def generate_sha256_hash_educationally():
 
         return b
     
-    def sha256(b: bytes) -> bytes:
-
-        # Section 4.2
-        K = genK()
-
-        # Section 5: Preprocessing
-        # Section 5.1: Pad the message
-        b = pad(b)
-        # Section 5.2: Separate the message into blocks of 512 bits (64 bytes)
-        blocks = [b[i:i+64] for i in range(0, len(b), 64)]
-
-        # for each message block M^1 ... M^N
-        H = genH() # Section 5.3
-
-        # Section 6
-        for M in blocks: # each block is a 64-entry array of 8-bit bytes
-
-            # 1. Prepare the message schedule, a 64-entry array of 32-bit words
-            W = []
-            for t in range(64):
-                if t <= 15:
-                    # the first 16 words are just a copy of the block
-                    W.append(bytes(M[t*4:t*4+4]))
-                else:
-                    term1 = sig1(b2i(W[t-2]))
-                    term2 = b2i(W[t-7])
-                    term3 = sig0(b2i(W[t-15]))
-                    term4 = b2i(W[t-16])
-                    total = (term1 + term2 + term3 + term4) % 2**32
-                    W.append(i2b(total))
-
-            # 2. Initialize the 8 working variables a,b,c,d,e,f,g,h with prev hash value
-            a, b, c, d, e, f, g, h = H
-
-            # 3.
-            for t in range(64):
-                T1 = (h + capsig1(e) + ch(e, f, g) + K[t] + b2i(W[t])) % 2**32
-                T2 = (capsig0(a) + maj(a, b, c)) % 2**32
-                h = g
-                g = f
-                f = e
-                e = (d + T1) % 2**32
-                d = c
-                c = b
-                b = a
-                a = (T1 + T2) % 2**32
-
-            # 4. Compute the i-th intermediate hash value H^i
-            delta = [a, b, c, d, e, f, g, h]
-            H = [(i1 + i2) % 2**32 for i1, i2 in zip(H, delta)]
-
-        return b''.join(i2b(i) for i in H)
-
-    return sha256
+    # Section 4.2
+    K = genK()
+    
+    # Section 5: Preprocessing
+    # Section 5.1: Pad the message
+    b = pad(b)
+    # Section 5.2: Separate the message into blocks of 512 bits (64 bytes)
+    blocks = [b[i:i+64] for i in range(0, len(b), 64)]
+    # for each message block M^1 ... M^N
+    H = genH() # Section 5.3
+    
+    # Section 6
+    for M in blocks: # each block is a 64-entry array of 8-bit bytes
+        # 1. Prepare the message schedule, a 64-entry array of 32-bit words
+        W = []
+        for t in range(64):
+            if t <= 15:
+                # the first 16 words are just a copy of the block
+                W.append(bytes(M[t*4:t*4+4]))
+            else:
+                term1 = sig1(b2i(W[t-2]))
+                term2 = b2i(W[t-7])
+                term3 = sig0(b2i(W[t-15]))
+                term4 = b2i(W[t-16])
+                total = (term1 + term2 + term3 + term4) % 2**32
+                W.append(i2b(total))
+        # 2. Initialize the 8 working variables a,b,c,d,e,f,g,h with prev hash value
+        a, b, c, d, e, f, g, h = H
+        # 3.
+        for t in range(64):
+            T1 = (h + capsig1(e) + ch(e, f, g) + K[t] + b2i(W[t])) % 2**32
+            T2 = (capsig0(a) + maj(a, b, c)) % 2**32
+            h = g
+            g = f
+            f = e
+            e = (d + T1) % 2**32
+            d = c
+            c = b
+            b = a
+            a = (T1 + T2) % 2**32
+        # 4. Compute the i-th intermediate hash value H^i
+        delta = [a, b, c, d, e, f, g, h]
+        H = [(i1 + i2) % 2**32 for i1, i2 in zip(H, delta)]
+    
+    return b''.join(i2b(i) for i in H)
 
 
-def generate_ripemd160_hash_educationally():
+def generate_ripemd160_hash(b: bytes) -> bytes:
     """
     RIPEMD-160 implementation to achieve self-imposed goal of having no dependencies. 
     (`hashlib` is more suited for this but it's a dependency.)
     """
 
-    print("Generating RIPEMD-160 hash educationally...")
-
     import sys
     import struct
-
-    # -----------------------------------------------------------------------------
-    # public interface
-
-    def ripemd160(b: bytes) -> bytes:
-        """ simple wrapper for a simpler API to this hash function, just bytes to bytes """
-        ctx = RMDContext()
-        RMD160Update(ctx, b, len(b))
-        digest = RMD160Final(ctx)
-        return digest
 
     # -----------------------------------------------------------------------------
 
@@ -704,12 +682,109 @@ def generate_ripemd160_hash_educationally():
         state[4] = (state[0] + bb + c) % 0x100000000
         state[0] = t % 0x100000000
 
-    return ripemd160
+    """ simple wrapper for a simpler API to this hash function, just bytes to bytes """
+    ctx = RMDContext()
+    RMD160Update(ctx, b, len(b))
+    digest = RMD160Final(ctx)
+    
+    return digest
+    
 
+def b58encode(b: bytes) -> str:
+    # base58 encoding / decoding utilities
+    # reference: https://en.bitcoin.it/wiki/Base58Check_encoding
+
+    alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    
+    assert len(b) == 25 # version is 1 byte, pkb_hash 20 bytes, checksum 4 bytes
+    n = int.from_bytes(b, 'big')
+    chars = []
+    while n:
+        n, i = divmod(n, 58)
+        chars.append(alphabet[i])
+    # special case handle the leading 0 bytes... ¯\_(ツ)_/¯
+    num_leading_zeros = len(b) - len(b.lstrip(b'\x00'))
+    res = num_leading_zeros * alphabet[0] + ''.join(reversed(chars))
+    return res
+
+
+class PublicKey(Point):
+    """
+    The public key is just a Point on a Curve, but has some additional specific
+    encoding / decoding functionality that this class implements.
+    """
+
+    @classmethod
+    def from_point(cls: Type['PublicKey'], pt: Point) -> 'PublicKey':
+        """ promote a Point to be a PublicKey """
+        return cls(pt.curve, pt.x, pt.y)
+
+    def encode(self, compressed, hash160=False):
+        """ return the SEC bytes encoding of the public key Point """
+        # calculate the bytes
+        if compressed:
+            # (x,y) is very redundant. Because y^2 = x^3 + 7,
+            # we can just encode x, and then y = +/- sqrt(x^3 + 7),
+            # so we need one more bit to encode whether it was the + or the -
+            # but because this is modular arithmetic there is no +/-, instead
+            # it can be shown that one y will always be even and the other odd.
+            prefix = b'\x02' if self.y % 2 == 0 else b'\x03'
+            pkb = prefix + self.x.to_bytes(32, 'big')
+        else:
+            pkb = b'\x04' + self.x.to_bytes(32, 'big') + self.y.to_bytes(32, 'big')
+        # hash if desired
+        return generate_ripemd160_hash(generate_sha256_hash(pkb)) if hash160 else pkb
+
+    def address(self, net: str, compressed: bool) -> str:
+        """ return the associated bitcoin address for this public key as string """
+        # encode the public key into bytes and hash to get the payload
+        pkb_hash = self.encode(compressed=compressed, hash160=True)
+        # add version byte (0x00 for Main Network, or 0x6f for Test Network)
+        version = {'main': b'\x00', 'test': b'\x6f'}
+        ver_pkb_hash = version[net] + pkb_hash
+        # calculate the checksum
+        checksum = generate_sha256_hash(generate_sha256_hash(ver_pkb_hash))[:4]
+        # append to form the full 25-byte binary Bitcoin Address
+        byte_address = ver_pkb_hash + checksum
+        # finally b58 encode the result
+        b58check_address = b58encode(byte_address)
+        return b58check_address
+
+
+def verify_shaw() -> None:
+    print("Verifying sha256 hash function...")
+    print("    verify empty hash:", generate_sha256_hash(b'').hex()) # should be e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    print("    ", generate_sha256_hash(b'here is a random bytes message, cool right?').hex())
+    print("    number of bytes in a sha256 digest: ", len(generate_sha256_hash(b'')))
+
+
+def verify_ripemd160() -> None:
+    print("Verifying ripemd160 hash function...")
+    print("    ", generate_ripemd160_hash(b'hello this is a test').hex())
+    print("    number of bytes in a RIPEMD-160 digest: ", len(generate_ripemd160_hash(b'')))
+
+
+def verify_bitcoin_address(address: str) -> None:
+    print("Verifying bitcoin address...")
+    print("    ", address)
+    
+
+def part_one_summary(secret_key: int, public_key: Point, address: str) -> None:
+    print("Our first Bitcoin identity:")
+    print("    Picking a random number *is* our secret key:")
+    print("        secret key      : ", secret_key)
+    print("    Adding the generator point to itself secret_key times gives us the public key:")
+    print("    (which is just a point on the curve --> it has x and y coordinates)")
+    print("        public key.x    : ", public_key.x)
+    print("        public key.y    : ", public_key.y)
+    print("    After some sha256 and ripemd160 hashing, we Base58 encode to get the bitcoin address:")
+    print("        Bitcoin address : ", address)
 
 
 def main():
     preamble()
+    
+    # Part 1
     bitcoin_curve = create_bitcoin_curve()
     G = create_generator_point(bitcoin_curve)
     bitcoin_gen = create_the_bitcoin_generator(G)
@@ -717,13 +792,11 @@ def main():
     recreate_keypair_examples(G, bitcoin_curve)
     recreate_more_efficient_examples(G)
     public_key = generate_public_key(secret_key, G, bitcoin_curve)
-    sha256_function = generate_sha256_hash_educationally()
-    print("    verify empty hash:", sha256_function(b'').hex()) # should be e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    print("    ", sha256_function(b'here is a random bytes message, cool right?').hex())
-    print("    number of bytes in a sha256 digest: ", len(sha256_function(b'')))
-    ripemd160 = generate_ripemd160_hash_educationally()
-    print("    ", ripemd160(b'hello this is a test').hex())
-    print("    number of bytes in a RIPEMD-160 digest: ", len(ripemd160(b'')))
+    verify_shaw()
+    verify_ripemd160()    
+    address = PublicKey.from_point(public_key).address(net='test', compressed=True)
+    verify_bitcoin_address(address)
+    part_one_summary(secret_key, public_key, address)
     
     postamble()
 
